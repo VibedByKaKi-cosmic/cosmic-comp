@@ -11,7 +11,7 @@ use crate::{
     shell::{
         ModalBehavior,
         element::{CosmicMappedKey, CosmicMappedKeyInner},
-        focus::target::PointerFocusTarget,
+        focus::target::{KeyboardFocusTarget, PointerFocusTarget},
         grabs::{GrabType, ReleaseMode, ResizeEdge},
         layout::tiling::NodeDesc,
     },
@@ -654,6 +654,11 @@ impl CosmicStack {
             .with_program(|p| p.group_focused.store(true, Ordering::SeqCst));
     }
 
+    fn unfocus_group(&self) {
+        self.0
+            .with_program(|p| p.group_focused.store(false, Ordering::SeqCst));
+    }
+
     pub(in super::super) fn loop_handle(&self) -> LoopHandle<'static, crate::state::State> {
         self.0.loop_handle()
     }
@@ -1135,12 +1140,42 @@ impl Program for CosmicStackInternal {
             Message::Activate(idx) => {
                 *self.potential_drag.lock().unwrap() = None;
                 if let Some(surface) = self.windows.lock().unwrap().get(idx).cloned() {
+                    let last_seat = last_seat.cloned();
                     loop_handle.insert_idle(move |state| {
-                        if let Some(mapped) =
-                            state.common.shell.read().element_for_surface(&surface)
+                        let Some(mapped) = state
+                            .common
+                            .shell
+                            .read()
+                            .element_for_surface(&surface)
+                            .cloned()
+                        else {
+                            return;
+                        };
+                        let Some(stack) = mapped.stack_ref() else {
+                            return;
+                        };
+                        stack.set_active(&surface);
+
+                        // The pointer press on the tab already moved keyboard focus to this
+                        // stack (see input handling in `Shell::set_focus`), so the stack
+                        // holds focus here unless a modal dialog redirected it. Only then
+                        // move focus and the activated state to the selected tab.
+                        let Some((seat, serial)) = last_seat else {
+                            return;
+                        };
+                        let Some(keyboard) = seat.get_keyboard() else {
+                            return;
+                        };
+                        if keyboard.current_focus().as_ref()
+                            != Some(&KeyboardFocusTarget::Element(mapped.clone()))
                         {
-                            mapped.stack_ref().unwrap().set_active(&surface);
+                            return;
                         }
+                        // A clicked tab replaces group focus (keyboard selection of the
+                        // stack header), so the tab itself carries the focus styling.
+                        stack.unfocus_group();
+                        mapped.set_activate(true);
+                        stack.keyboard_leave_if_previous(&seat, state, serial);
                     });
                     self.scroll_to_focus.store(true, Ordering::SeqCst);
                 }
