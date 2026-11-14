@@ -153,11 +153,15 @@ pub struct ScreenFilter {
     pub inverted: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_filter: Option<ColorFilter>,
+    /// Night light strength from 0.0 (off) to 1.0 (full warm tint).
+    /// Driven by `CosmicCompConfig::night_light`, so it is not persisted.
+    #[serde(skip)]
+    pub night_light: f32,
 }
 
 impl ScreenFilter {
     pub fn is_noop(&self) -> bool {
-        !self.inverted && self.color_filter.is_none()
+        !self.inverted && self.color_filter.is_none() && self.night_light <= 0.0
     }
 }
 
@@ -342,8 +346,11 @@ impl Config {
                 .set_screen_filter(filter_conf.color_filter);
         });
 
+        let mut dynamic_conf = Self::load_dynamic(&xdg);
+        dynamic_conf.set_night_light(cosmic_comp_config.night_light);
+
         Config {
-            dynamic_conf: Self::load_dynamic(&xdg),
+            dynamic_conf,
             cosmic_conf: cosmic_comp_config,
             cosmic_helper: config,
             settings_context,
@@ -409,6 +416,7 @@ impl Config {
         ScreenFilter {
             inverted: false,
             color_filter: None,
+            night_light: 0.0,
         }
     }
 
@@ -749,6 +757,11 @@ impl DynamicConfig {
         &self.accessibility_filter.1
     }
 
+    /// Sets the in-memory night light strength. This does not persist to the state file.
+    pub fn set_night_light(&mut self, enabled: bool) {
+        self.accessibility_filter.1.night_light = if enabled { 1.0 } else { 0.0 };
+    }
+
     pub fn screen_filter_mut(&mut self) -> PersistenceGuard<'_, ScreenFilter> {
         PersistenceGuard(
             self.accessibility_filter.0.clone(),
@@ -998,6 +1011,20 @@ fn config_changed(config: cosmic_config::Config, keys: Vec<String>, state: &mut 
             "cursor_shake_to_find" => {
                 let new = get_config::<bool>(&config, "cursor_shake_to_find");
                 state.common.config.cosmic_conf.cursor_shake_to_find = new;
+            }
+            "night_light" => {
+                let new = get_config::<bool>(&config, "night_light");
+                if new != state.common.config.cosmic_conf.night_light {
+                    state.common.config.cosmic_conf.night_light = new;
+                    state.common.config.dynamic_conf.set_night_light(new);
+                    let filter = state.common.config.dynamic_conf.screen_filter().clone();
+                    if let Err(err) = state.backend.update_screen_filter(&filter) {
+                        warn!(?err, "Failed to apply night light");
+                    }
+                    for output in state.common.shell.read().outputs() {
+                        state.backend.schedule_render(output);
+                    }
+                }
             }
             "cursor_hide" => {
                 let new = get_config::<CursorHideConfig>(&config, "cursor_hide");

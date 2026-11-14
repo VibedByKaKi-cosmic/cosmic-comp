@@ -113,6 +113,8 @@ pub struct CosmicCompConfig {
     pub cursor_shake_to_find: bool,
     pub activation_policy: ActivationPolicy,
     pub decoration_preference: DecorationPreference,
+    /// Warm the screen colors to reduce eye strain
+    pub night_light: bool,
 }
 
 impl Default for CosmicCompConfig {
@@ -153,6 +155,7 @@ impl Default for CosmicCompConfig {
             cursor_shake_to_find: true,
             activation_policy: ActivationPolicy::default(),
             decoration_preference: DecorationPreference::default(),
+            night_light: false,
         }
     }
 }

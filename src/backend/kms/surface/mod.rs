@@ -1902,6 +1902,7 @@ fn postprocess_elements<'a>(
                         .map(|val| val as u8 as f32)
                         .unwrap_or(0.),
                 ),
+                Uniform::new("night_light", screen_filter.night_light),
             ],
         ));
     }
@@ -1936,6 +1937,7 @@ fn postprocess_elements<'a>(
                     .map(|val| val as u8 as f32)
                     .unwrap_or(0.),
             ),
+            Uniform::new("night_light", screen_filter.night_light),
         ],
     ));
 
