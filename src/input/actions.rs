@@ -656,7 +656,10 @@ impl State {
                     if let Ok(Some((target, new_pos))) = res {
                         std::mem::drop(shell);
                         Shell::set_focus(self, Some(&target), seat, None, is_move_action);
-                        if let Some(ptr) = seat.get_pointer() {
+                        // Only move the pointer along with the window when cursor_follows_focus is enabled
+                        if self.common.config.cosmic_conf.cursor_follows_focus
+                            && let Some(ptr) = seat.get_pointer()
+                        {
                             ptr.motion(
                                 self,
                                 None,
