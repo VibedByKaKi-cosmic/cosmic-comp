@@ -10,7 +10,8 @@
 	(
 		appid: "", 
 		titles: [
-			"Steam",
+			// Steam dialogs, but not the main client window, whose title is exactly "Steam"
+			"^(.+Steam.*|Steam.+)$",
 			"wl-clipboard",
 		]
 	),
