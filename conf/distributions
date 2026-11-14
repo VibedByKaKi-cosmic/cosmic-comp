@@ -1,0 +1,5 @@
+Codename: stable
+Components: main
+Architectures: amd64
+Label: cosmic-comp APT Repository
+Description: cosmic-comp packages built from VibedByKaKi-cosmic/cosmic-comp

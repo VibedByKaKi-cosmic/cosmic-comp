@@ -1,0 +1,17 @@
+Package: cosmic-comp
+Version: 1.0.0-1+gitcf5cb3d
+Architecture: amd64
+Maintainer: Victoria Brekenfeld <victoria@system76.com>
+Installed-Size: 28511
+Depends: libc6 (>= 2.39), libdisplay-info1 (>= 0.1.1), libgbm1 (>= 21.3.0~rc1), libgcc-s1 (>= 4.2), libinput10 (>= 1.19.1), libpixman-1-0 (>= 0.30.0), libseat1 (>= 0.5.0), libudev1 (>= 183), libxkbcommon0 (>= 0.5.0), libegl1, libwayland-server0
+Recommends: cosmic-session, libgl1-mesa-dri
+Homepage: https://github.com/pop-os/cosmic-comp
+Priority: optional
+Section: x11
+Filename: pool/main/c/cosmic-comp/cosmic-comp_1.0.0-1+gitcf5cb3d_amd64.deb
+Size: 9542050
+SHA256: 4b4b3f27c46c707515f5783b983eabbaa0a288af60d622bf689c4072ed460c41
+SHA1: b33b9cc2929b3ee7c4ec33930c6b831ed3c6b30b
+MD5sum: 3fad169d8641e745a009c2d992e23223
+Description: Wayland compositor of pop-os cosmic shell
+

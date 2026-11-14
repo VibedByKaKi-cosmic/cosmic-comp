@@ -1,0 +1,4 @@
+Component: main
+Label: cosmic-comp APT Repository
+Architecture: amd64
+Description: cosmic-comp packages built from VibedByKaKi-cosmic/cosmic-comp
