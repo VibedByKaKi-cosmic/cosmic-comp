@@ -113,6 +113,8 @@ pub struct CosmicCompConfig {
     pub cursor_shake_to_find: bool,
     pub activation_policy: ActivationPolicy,
     pub decoration_preference: DecorationPreference,
+    /// Animate workspace switches. When disabled, switches happen instantly.
+    pub animations: bool,
 }
 
 impl Default for CosmicCompConfig {
@@ -153,6 +155,7 @@ impl Default for CosmicCompConfig {
             cursor_shake_to_find: true,
             activation_policy: ActivationPolicy::default(),
             decoration_preference: DecorationPreference::default(),
+            animations: true,
         }
     }
 }

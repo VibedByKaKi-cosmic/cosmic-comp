@@ -938,6 +938,13 @@ fn config_changed(config: cosmic_config::Config, keys: Vec<String>, state: &mut 
                     state.common.update_config();
                 }
             }
+            "animations" => {
+                let new = get_config::<bool>(&config, "animations");
+                if new != state.common.config.cosmic_conf.animations {
+                    state.common.config.cosmic_conf.animations = new;
+                    state.common.update_config();
+                }
+            }
             "descale_xwayland" => {
                 let new = get_config::<XwaylandDescaling>(&config, "descale_xwayland");
                 if new != state.common.config.cosmic_conf.descale_xwayland {
