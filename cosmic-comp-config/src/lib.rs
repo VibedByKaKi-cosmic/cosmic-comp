@@ -113,8 +113,15 @@ pub struct CosmicCompConfig {
     pub cursor_shake_to_find: bool,
     pub activation_policy: ActivationPolicy,
     pub decoration_preference: DecorationPreference,
-    /// Warm the screen colors to reduce eye strain
-    pub night_light: bool,
+    /// Warm the screen colors to reduce eye strain: off, always, or on a schedule
+    pub night_light_mode: NightLightMode,
+    /// Color temperature of the night light in Kelvin, from 1000 to 6500
+    pub night_light_temperature: u32,
+    /// Start of the scheduled night light, in minutes since local midnight
+    pub night_light_start: u32,
+    /// End of the scheduled night light, in minutes since local midnight.
+    /// An end before the start means the schedule crosses midnight.
+    pub night_light_end: u32,
 }
 
 impl Default for CosmicCompConfig {
@@ -155,9 +162,20 @@ impl Default for CosmicCompConfig {
             cursor_shake_to_find: true,
             activation_policy: ActivationPolicy::default(),
             decoration_preference: DecorationPreference::default(),
-            night_light: false,
+            night_light_mode: NightLightMode::default(),
+            night_light_temperature: 4000,
+            night_light_start: 20 * 60,
+            night_light_end: 6 * 60,
         }
     }
+}
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub enum NightLightMode {
+    #[default]
+    Off,
+    Always,
+    Scheduled,
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Deserialize, Serialize)]

@@ -421,7 +421,7 @@ pub fn init_shaders(renderer: &mut GlesRenderer) -> Result<(), GlesError> {
         &[
             UniformName::new("invert", UniformType::_1f),
             UniformName::new("color_mode", UniformType::_1f),
-            UniformName::new("night_light", UniformType::_1f),
+            UniformName::new("night_light", UniformType::_3f),
         ],
     )?;
     let clipping_shader = renderer.compile_custom_texture_shader(
@@ -1378,7 +1378,10 @@ where
                                 .map(|val| val as u8 as f32)
                                 .unwrap_or(0.),
                         ),
-                        Uniform::new("night_light", screen_filter.filter.night_light),
+                        Uniform::new(
+                            "night_light",
+                            screen_filter.filter.night_light.unwrap_or([1.0; 3]),
+                        ),
                     ],
                 );
                 constrain_render_elements(

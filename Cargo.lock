@@ -676,6 +676,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.13.2",
  "calloop",
+ "chrono",
  "clap_lex",
  "cosmic-comp-config",
  "cosmic-comp-ipc",
