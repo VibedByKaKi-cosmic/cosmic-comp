@@ -11,7 +11,7 @@ use crate::{
     shell::{
         ModalBehavior,
         element::{CosmicMappedKey, CosmicMappedKeyInner},
-        focus::target::PointerFocusTarget,
+        focus::target::{KeyboardFocusTarget, PointerFocusTarget},
         grabs::{GrabType, ReleaseMode, ResizeEdge},
         layout::tiling::NodeDesc,
     },
@@ -1135,12 +1135,36 @@ impl Program for CosmicStackInternal {
             Message::Activate(idx) => {
                 *self.potential_drag.lock().unwrap() = None;
                 if let Some(surface) = self.windows.lock().unwrap().get(idx).cloned() {
+                    let last_seat = last_seat.cloned();
                     loop_handle.insert_idle(move |state| {
-                        if let Some(mapped) =
-                            state.common.shell.read().element_for_surface(&surface)
+                        let Some(mapped) = state
+                            .common
+                            .shell
+                            .read()
+                            .element_for_surface(&surface)
+                            .cloned()
+                        else {
+                            return;
+                        };
+                        let Some(stack) = mapped.stack_ref() else {
+                            return;
+                        };
+                        stack.set_active(&surface);
+
+                        // If the stack has keyboard focus, move it to the selected tab.
+                        let Some((seat, serial)) = last_seat else {
+                            return;
+                        };
+                        let Some(keyboard) = seat.get_keyboard() else {
+                            return;
+                        };
+                        if keyboard.current_focus().as_ref()
+                            != Some(&KeyboardFocusTarget::Element(mapped.clone()))
                         {
-                            mapped.stack_ref().unwrap().set_active(&surface);
+                            return;
                         }
+                        mapped.set_activate(true);
+                        stack.keyboard_leave_if_previous(&seat, state, serial);
                     });
                     self.scroll_to_focus.store(true, Ordering::SeqCst);
                 }
