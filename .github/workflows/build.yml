@@ -1,0 +1,123 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  build:
+    name: Build amd64 package
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup
+
+      - name: Install build dependencies from debian/control
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends devscripts equivs
+          workdir="$(mktemp -d)"
+          cd "$workdir"
+          sudo mk-build-deps --install --remove \
+            --tool 'apt-get -y --no-install-recommends' \
+            "$GITHUB_WORKSPACE/debian/control"
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup show
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Set package version
+        run: .ci/set-version.sh
+
+      - name: Build Debian package
+        run: .ci/build-deb.sh
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmic-comp-amd64
+          path: artifacts/*.deb
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set package version
+        run: .ci/set-version.sh
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: cosmic-comp-*
+          merge-multiple: true
+
+      - name: Set release metadata
+        run: |
+          {
+            echo "TAG=v${UPSTREAM_VERSION}+git.${SHORT_SHA}"
+            echo "TITLE=cosmic-comp ${UPSTREAM_VERSION} (${SHORT_SHA})"
+          } >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TITLE }}
+          prerelease: true
+          generate_release_notes: true
+          files: artifacts/*.deb
+
+  apt:
+    name: Update APT repository
+    needs: release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set package version
+        run: .ci/set-version.sh
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: cosmic-comp-*
+          merge-multiple: true
+
+      - name: Install APT repository tools
+        run: sudo apt-get update && sudo apt-get install -y reprepro gnupg
+
+      - name: Update apt branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APT_REPO_GPG_PRIVATE_KEY: ${{ secrets.APT_REPO_GPG_PRIVATE_KEY }}
+        run: .ci/update-apt-repo.sh
