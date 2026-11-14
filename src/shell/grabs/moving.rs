@@ -59,14 +59,14 @@ use smithay::{
 use std::{
     collections::HashSet,
     sync::{Mutex, atomic::Ordering},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use super::{GrabStartData, ReleaseMode};
 
 pub type SeatMoveGrabState = Mutex<Option<MoveGrabState>>;
 
-const RESCALE_ANIMATION_DURATION: f64 = 150.0;
+const RESCALE_ANIMATION_DURATION: Duration = Duration::from_millis(150);
 
 pub struct MoveGrabState {
     window: CosmicMapped,
@@ -95,11 +95,11 @@ impl MoveGrabState {
         CosmicMappedRenderElement<R>: RenderElement<R>,
     {
         let scale = if self.previous == ManagedLayer::Tiling {
-            0.6 + ((1.0
-                - (Instant::now().duration_since(self.start).as_millis() as f64
-                    / RESCALE_ANIMATION_DURATION)
-                    .min(1.0))
-                * 0.4)
+            let progress = crate::utils::animation::progress(
+                Instant::now().duration_since(self.start),
+                RESCALE_ANIMATION_DURATION,
+            );
+            0.6 + ((1.0 - progress as f64) * 0.4)
         } else {
             1.0
         };

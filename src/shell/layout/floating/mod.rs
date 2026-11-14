@@ -105,19 +105,17 @@ impl Animation {
         match self {
             Animation::Tiled { .. } | Animation::Shake { .. } => 1.0,
             Animation::Minimize { start, .. } => {
-                let percentage = Instant::now()
-                    .duration_since(*start)
-                    .min(MINIMIZE_ANIMATION_DURATION)
-                    .as_secs_f32()
-                    / MINIMIZE_ANIMATION_DURATION.as_secs_f32();
+                let percentage = crate::utils::animation::progress(
+                    Instant::now().duration_since(*start),
+                    MINIMIZE_ANIMATION_DURATION,
+                );
                 1.0 - ((percentage - 0.5).max(0.0) * 2.0)
             }
             Animation::Unminimize { start, .. } => {
-                let percentage = Instant::now()
-                    .duration_since(*start)
-                    .min(MINIMIZE_ANIMATION_DURATION)
-                    .as_secs_f32()
-                    / MINIMIZE_ANIMATION_DURATION.as_secs_f32();
+                let percentage = crate::utils::animation::progress(
+                    Instant::now().duration_since(*start),
+                    MINIMIZE_ANIMATION_DURATION,
+                );
                 (percentage * 2.0).min(1.0)
             }
         }
@@ -147,11 +145,10 @@ impl Animation {
     ) -> Rectangle<i32, Local> {
         let (duration, target_rect) = match self {
             Animation::Shake { start, geometry } => {
-                let progress = Instant::now()
-                    .duration_since(*start)
-                    .min(SHAKE_ANIMATION_DURATION)
-                    .as_secs_f32()
-                    / SHAKE_ANIMATION_DURATION.as_secs_f32();
+                let progress = crate::utils::animation::progress(
+                    Instant::now().duration_since(*start),
+                    SHAKE_ANIMATION_DURATION,
+                );
                 let envelope: f32 = ease(EaseOutCubic, 1.0, 0.0, progress);
                 let offset =
                     (SHAKE_AMPLITUDE * envelope * (progress * 3.0 * std::f32::consts::TAU).sin())
@@ -182,7 +179,7 @@ impl Animation {
         let start = *self.start();
         let now = Instant::now();
         let progress =
-            now.duration_since(start).min(duration).as_secs_f64() / duration.as_secs_f64();
+            crate::utils::animation::progress(now.duration_since(start), duration) as f64;
 
         ease(
             EaseInOutCubic,
@@ -1462,9 +1459,11 @@ impl FloatingLayout {
         let was_empty = self.animations.is_empty();
         self.animations.retain(|_, anim| {
             let duration = match anim {
-                Animation::Tiled { .. } => ANIMATION_DURATION,
-                Animation::Shake { .. } => SHAKE_ANIMATION_DURATION,
-                _ => MINIMIZE_ANIMATION_DURATION,
+                Animation::Tiled { .. } => crate::utils::animation::duration(ANIMATION_DURATION),
+                Animation::Shake { .. } => {
+                    crate::utils::animation::duration(SHAKE_ANIMATION_DURATION)
+                }
+                _ => crate::utils::animation::duration(MINIMIZE_ANIMATION_DURATION),
             };
             Instant::now().duration_since(*anim.start()) < duration
         });

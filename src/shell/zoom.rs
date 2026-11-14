@@ -113,13 +113,12 @@ impl OutputZoomState {
     pub fn animating_focal_point(&mut self) -> Point<f64, Local> {
         if let Some((old_point, start)) = self.previous_point.as_ref() {
             let duration_since = Instant::now().duration_since(*start);
-            if duration_since > ANIMATION_DURATION {
+            if duration_since > crate::utils::animation::duration(ANIMATION_DURATION) {
                 self.previous_point.take();
                 return self.focal_point;
             }
 
-            let percentage =
-                duration_since.as_millis() as f32 / ANIMATION_DURATION.as_millis() as f32;
+            let percentage = crate::utils::animation::progress(duration_since, ANIMATION_DURATION);
             ease(
                 Linear,
                 EasePoint(*old_point),
@@ -142,8 +141,10 @@ impl OutputZoomState {
 
     pub fn animating_level(&self) -> f64 {
         if let Some((old_level, start)) = self.previous_level.as_ref() {
-            let percentage = Instant::now().duration_since(*start).as_millis() as f32
-                / ANIMATION_DURATION.as_millis() as f32;
+            let percentage = crate::utils::animation::progress(
+                Instant::now().duration_since(*start),
+                ANIMATION_DURATION,
+            );
 
             ease(Linear, *old_level, self.level, percentage)
         } else {
@@ -156,11 +157,10 @@ impl OutputZoomState {
     }
 
     pub fn refresh(&mut self) -> bool {
-        if self
-            .previous_level
-            .as_ref()
-            .is_some_and(|(_, start)| Instant::now().duration_since(*start) > ANIMATION_DURATION)
-        {
+        if self.previous_level.as_ref().is_some_and(|(_, start)| {
+            Instant::now().duration_since(*start)
+                > crate::utils::animation::duration(ANIMATION_DURATION)
+        }) {
             self.previous_level.take();
         }
         self.element.refresh();

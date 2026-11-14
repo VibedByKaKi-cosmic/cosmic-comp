@@ -674,7 +674,10 @@ impl CursorStateInner {
         self.magnification = match self.anim_start {
             Some(start) => {
                 // `ease` clamps the time to `0.0..=1.0` for us.
-                let t = now.duration_since(start).as_secs_f32() / MAGNIFICATION_ANIM.as_secs_f32();
+                let t = crate::utils::animation::progress(
+                    now.duration_since(start),
+                    MAGNIFICATION_ANIM,
+                );
                 if t >= 1.0 {
                     self.anim_start = None;
                 }

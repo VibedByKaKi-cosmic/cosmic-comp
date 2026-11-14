@@ -551,7 +551,8 @@ impl Workspace {
         for f in self.fullscreen_surfaces.iter_mut() {
             if let Some(start) = f.start_at.as_ref() {
                 let duration_since = Instant::now().duration_since(*start);
-                if duration_since > FULLSCREEN_ANIMATION_DURATION {
+                if duration_since > crate::utils::animation::duration(FULLSCREEN_ANIMATION_DURATION)
+                {
                     f.start_at.take();
                     self.dirty.store(true, Ordering::SeqCst);
                 }
@@ -560,7 +561,8 @@ impl Workspace {
 
         self.fullscreen_surfaces.retain(|f| {
             if let Some(end) = f.ended_at
-                && Instant::now().duration_since(end) >= FULLSCREEN_ANIMATION_DURATION
+                && Instant::now().duration_since(end)
+                    >= crate::utils::animation::duration(FULLSCREEN_ANIMATION_DURATION)
             {
                 self.dirty.store(true, Ordering::SeqCst);
                 return false;
@@ -1057,15 +1059,19 @@ impl Workspace {
                 f.previous_geometry = Some(to);
                 f.ended_at = Some(
                     Instant::now()
-                        - (FULLSCREEN_ANIMATION_DURATION
+                        - (crate::utils::animation::duration(FULLSCREEN_ANIMATION_DURATION)
                             - f.start_at
                                 .take()
                                 .map(|earlier| {
-                                    Instant::now()
-                                        .duration_since(earlier)
-                                        .min(FULLSCREEN_ANIMATION_DURATION)
+                                    Instant::now().duration_since(earlier).min(
+                                        crate::utils::animation::duration(
+                                            FULLSCREEN_ANIMATION_DURATION,
+                                        ),
+                                    )
                                 })
-                                .unwrap_or(FULLSCREEN_ANIMATION_DURATION)),
+                                .unwrap_or(crate::utils::animation::duration(
+                                    FULLSCREEN_ANIMATION_DURATION,
+                                ))),
                 );
             }
 
@@ -1339,16 +1345,18 @@ impl Workspace {
 
         surface.ended_at = Some(
             Instant::now()
-                - (FULLSCREEN_ANIMATION_DURATION
+                - (crate::utils::animation::duration(FULLSCREEN_ANIMATION_DURATION)
                     - surface
                         .start_at
                         .take()
                         .map(|earlier| {
-                            Instant::now()
-                                .duration_since(earlier)
-                                .min(FULLSCREEN_ANIMATION_DURATION)
+                            Instant::now().duration_since(earlier).min(
+                                crate::utils::animation::duration(FULLSCREEN_ANIMATION_DURATION),
+                            )
                         })
-                        .unwrap_or(FULLSCREEN_ANIMATION_DURATION)),
+                        .unwrap_or(crate::utils::animation::duration(
+                            FULLSCREEN_ANIMATION_DURATION,
+                        ))),
         );
 
         Some((
@@ -1656,8 +1664,10 @@ impl Workspace {
 
                 let (target_geo, alpha) = match (fullscreen.start_at, fullscreen.ended_at) {
                     (Some(started), _) => {
-                        let duration = Instant::now().duration_since(started).as_secs_f64()
-                            / FULLSCREEN_ANIMATION_DURATION.as_secs_f64();
+                        let duration = crate::utils::animation::progress(
+                            Instant::now().duration_since(started),
+                            FULLSCREEN_ANIMATION_DURATION,
+                        ) as f64;
                         (
                             ease(
                                 EaseInOutCubic,
@@ -1670,8 +1680,10 @@ impl Workspace {
                         )
                     }
                     (_, Some(ended)) => {
-                        let duration = Instant::now().duration_since(ended).as_secs_f64()
-                            / FULLSCREEN_ANIMATION_DURATION.as_secs_f64();
+                        let duration = crate::utils::animation::progress(
+                            Instant::now().duration_since(ended),
+                            FULLSCREEN_ANIMATION_DURATION,
+                        ) as f64;
                         (
                             ease(
                                 EaseInOutCubic,
@@ -1754,16 +1766,19 @@ impl Workspace {
             // floating surfaces
             let alpha = match &overview.0 {
                 OverviewMode::Started(_, started) => {
-                    (1.0 - (Instant::now().duration_since(*started).as_millis()
-                        / ANIMATION_DURATION.as_millis()) as f32)
-                        .max(0.0)
+                    (1.0 - crate::utils::animation::progress(
+                        Instant::now().duration_since(*started),
+                        ANIMATION_DURATION,
+                    ))
+                    .max(0.0)
                         * 0.4
                         + 0.6
                 }
                 OverviewMode::Ended(_, ended) => {
-                    ((Instant::now().duration_since(*ended).as_millis()
-                        / ANIMATION_DURATION.as_millis()) as f32)
-                        * 0.4
+                    (crate::utils::animation::progress(
+                        Instant::now().duration_since(*ended),
+                        ANIMATION_DURATION,
+                    )) * 0.4
                         + 0.6
                 }
                 OverviewMode::Active(_) => 0.6,
@@ -1885,8 +1900,10 @@ impl Workspace {
 
             let (target_geo, alpha) = match (fullscreen.start_at, fullscreen.ended_at) {
                 (Some(started), _) => {
-                    let duration = Instant::now().duration_since(started).as_secs_f64()
-                        / FULLSCREEN_ANIMATION_DURATION.as_secs_f64();
+                    let duration = crate::utils::animation::progress(
+                        Instant::now().duration_since(started),
+                        FULLSCREEN_ANIMATION_DURATION,
+                    ) as f64;
                     (
                         ease(
                             EaseInOutCubic,
@@ -1899,8 +1916,10 @@ impl Workspace {
                     )
                 }
                 (_, Some(ended)) => {
-                    let duration = Instant::now().duration_since(ended).as_secs_f64()
-                        / FULLSCREEN_ANIMATION_DURATION.as_secs_f64();
+                    let duration = crate::utils::animation::progress(
+                        Instant::now().duration_since(ended),
+                        FULLSCREEN_ANIMATION_DURATION,
+                    ) as f64;
                     (
                         ease(
                             EaseInOutCubic,
@@ -1945,16 +1964,19 @@ impl Workspace {
             // floating surfaces
             let alpha = match &overview.0 {
                 OverviewMode::Started(_, started) => {
-                    (1.0 - (Instant::now().duration_since(*started).as_millis()
-                        / ANIMATION_DURATION.as_millis()) as f32)
-                        .max(0.0)
+                    (1.0 - crate::utils::animation::progress(
+                        Instant::now().duration_since(*started),
+                        ANIMATION_DURATION,
+                    ))
+                    .max(0.0)
                         * 0.4
                         + 0.6
                 }
                 OverviewMode::Ended(_, ended) => {
-                    ((Instant::now().duration_since(*ended).as_millis()
-                        / ANIMATION_DURATION.as_millis()) as f32)
-                        * 0.4
+                    (crate::utils::animation::progress(
+                        Instant::now().duration_since(*ended),
+                        ANIMATION_DURATION,
+                    )) * 0.4
                         + 0.6
                 }
                 OverviewMode::Active(_) => 0.6,
