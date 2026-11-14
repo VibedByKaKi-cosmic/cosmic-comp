@@ -569,7 +569,7 @@ impl State {
                         res
                     };
 
-                    if let Ok(new_pos) = res {
+                    if res.is_ok() {
                         let workspace = shell.workspaces.active(&next_output).unwrap().1;
                         let new_target = workspace
                             .focus_stack
@@ -579,24 +579,9 @@ impl State {
                             .map(Into::<KeyboardFocusTarget>::into);
                         std::mem::drop(shell);
 
-                        let update_cursor = self.common.config.cosmic_conf.cursor_follows_focus;
-                        Shell::set_focus(self, new_target.as_ref(), seat, None, update_cursor);
-
-                        if let Some(ptr) = seat.get_pointer() {
-                            // Update cursor position if `set_focus` didn't already
-                            if !update_cursor {
-                                ptr.motion(
-                                    self,
-                                    None,
-                                    &MotionEvent {
-                                        location: new_pos.to_f64().as_logical(),
-                                        serial,
-                                        time,
-                                    },
-                                );
-                            }
-                            ptr.frame(self);
-                        }
+                        // `set_focus` warps the pointer to the new focus only when
+                        // cursor_follows_focus is enabled. Do not warp otherwise.
+                        Shell::set_focus(self, new_target.as_ref(), seat, None, true);
                     }
                 }
             }
