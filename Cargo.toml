@@ -13,6 +13,7 @@ members = ["cosmic-comp-config", "cosmic-comp-ipc"]
 anyhow = { version = "1.0.102", features = ["backtrace"] }
 bitflags = "2.11.0"
 calloop = { version = "0.14.4", features = ["executor", "stream"] }
+chrono = "0.4"
 cosmic-comp-config = { path = "cosmic-comp-config", features = [
     "libdisplay-info",
     "output",

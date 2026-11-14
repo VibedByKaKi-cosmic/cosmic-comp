@@ -10,6 +10,8 @@ use crate::{
     },
 };
 use anyhow::Context;
+use calloop::timer::{TimeoutAction, Timer};
+use chrono::{Local, Timelike};
 use cosmic_config::{ConfigGet, ConfigSet, CosmicConfigEntry};
 use cosmic_settings_config::window_rules::ApplicationException;
 use cosmic_settings_config::{Shortcuts, shortcuts, window_rules};
@@ -50,7 +52,8 @@ use cosmic::config::CosmicTk;
 pub use cosmic_comp_config::EdidProduct;
 use cosmic_comp_config::{
     ActivationPolicy, AppearanceConfig, CosmicCompConfig, CursorHideConfig, DecorationPreference,
-    KeyboardConfig, TileBehavior, XkbConfig, XwaylandDescaling, XwaylandEavesdropping, ZoomConfig,
+    KeyboardConfig, NightLightMode, TileBehavior, XkbConfig, XwaylandDescaling,
+    XwaylandEavesdropping, ZoomConfig,
     input::{DeviceState as InputDeviceState, InputConfig, TouchpadOverride},
     output::comp::{
         OutputConfig, OutputInfo, OutputState, OutputsConfig, TransformDef, load_outputs,
@@ -153,11 +156,93 @@ pub struct ScreenFilter {
     pub inverted: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_filter: Option<ColorFilter>,
+    /// RGB multipliers of the night light, or `None` when it is off.
+    /// Derived from `CosmicCompConfig`, so it is not persisted.
+    #[serde(skip)]
+    pub night_light: Option<[f32; 3]>,
 }
 
 impl ScreenFilter {
     pub fn is_noop(&self) -> bool {
-        !self.inverted && self.color_filter.is_none()
+        !self.inverted && self.color_filter.is_none() && self.night_light.is_none()
+    }
+}
+
+/// How often the compositor re-checks the scheduled night light.
+const NIGHT_LIGHT_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
+const MINUTES_PER_DAY: u32 = 24 * 60;
+
+/// Returns the night light tint for the settings and the current local time,
+/// or `None` when the night light is off.
+pub fn night_light_tint(conf: &CosmicCompConfig) -> Option<[f32; 3]> {
+    let active = match conf.night_light_mode {
+        NightLightMode::Off => false,
+        NightLightMode::Always => true,
+        NightLightMode::Scheduled => {
+            let now = Local::now();
+            let minute = now.hour() * 60 + now.minute();
+            is_within_schedule(minute, conf.night_light_start, conf.night_light_end)
+        }
+    };
+    active.then(|| kelvin_to_rgb_multipliers(conf.night_light_temperature))
+}
+
+/// Whether `minute` (minutes since local midnight) lies in the range from `start`
+/// (inclusive) to `end` (exclusive). A `start` after `end` wraps past midnight.
+/// Equal values form an empty range.
+fn is_within_schedule(minute: u32, start: u32, end: u32) -> bool {
+    let start = start % MINUTES_PER_DAY;
+    let end = end % MINUTES_PER_DAY;
+    if start <= end {
+        (start..end).contains(&minute)
+    } else {
+        minute >= start || minute < end
+    }
+}
+
+/// RGB multipliers that tint the screen toward a color temperature in Kelvin.
+///
+/// Uses Tanner Helland's approximation of blackbody color. The brightest
+/// channel is scaled to 1.0, so the tint lowers the other channels and keeps
+/// the overall brightness.
+pub fn kelvin_to_rgb_multipliers(kelvin: u32) -> [f32; 3] {
+    let temp = f64::from(kelvin.clamp(1000, 6500)) / 100.0;
+    let red = if temp <= 66.0 {
+        255.0
+    } else {
+        329.698_727_446 * (temp - 60.0).powf(-0.133_204_759_2)
+    };
+    let green = if temp <= 66.0 {
+        99.470_802_586_1 * temp.ln() - 161.119_568_166_1
+    } else {
+        288.122_169_528_3 * (temp - 60.0).powf(-0.075_514_849_2)
+    };
+    let blue = if temp >= 66.0 {
+        255.0
+    } else if temp <= 19.0 {
+        0.0
+    } else {
+        138.517_731_223_1 * (temp - 10.0).ln() - 305.044_792_730_7
+    };
+    let rgb = [red, green, blue].map(|channel| channel.clamp(0.0, 255.0));
+    let max = rgb[0].max(rgb[1]).max(rgb[2]);
+    rgb.map(|channel| (channel / max) as f32)
+}
+
+/// Applies the night light for the current settings and time to every output.
+/// Does nothing when the tint has not changed.
+pub fn apply_night_light(state: &mut State) {
+    let tint = night_light_tint(&state.common.config.cosmic_conf);
+    if state.common.config.dynamic_conf.screen_filter().night_light == tint {
+        return;
+    }
+    state.common.config.dynamic_conf.set_night_light(tint);
+    let filter = state.common.config.dynamic_conf.screen_filter().clone();
+    if let Err(err) = state.backend.update_screen_filter(&filter) {
+        warn!(?err, "Failed to apply night light");
+    }
+    for output in state.common.shell.read().outputs() {
+        state.backend.schedule_render(output);
     }
 }
 
@@ -342,8 +427,22 @@ impl Config {
                 .set_screen_filter(filter_conf.color_filter);
         });
 
+        let mut dynamic_conf = Self::load_dynamic(&xdg);
+        dynamic_conf.set_night_light(night_light_tint(&cosmic_comp_config));
+
+        // The schedule depends on the time of day, so re-check it periodically.
+        if let Err(err) = loop_handle.insert_source(
+            Timer::from_duration(NIGHT_LIGHT_CHECK_INTERVAL),
+            |_, _, state| {
+                apply_night_light(state);
+                TimeoutAction::ToDuration(NIGHT_LIGHT_CHECK_INTERVAL)
+            },
+        ) {
+            warn!(?err, "Failed to schedule the night light check");
+        }
+
         Config {
-            dynamic_conf: Self::load_dynamic(&xdg),
+            dynamic_conf,
             cosmic_conf: cosmic_comp_config,
             cosmic_helper: config,
             settings_context,
@@ -409,6 +508,7 @@ impl Config {
         ScreenFilter {
             inverted: false,
             color_filter: None,
+            night_light: None,
         }
     }
 
@@ -749,6 +849,11 @@ impl DynamicConfig {
         &self.accessibility_filter.1
     }
 
+    /// Sets the in-memory night light tint. This does not persist to the state file.
+    pub fn set_night_light(&mut self, tint: Option<[f32; 3]>) {
+        self.accessibility_filter.1.night_light = tint;
+    }
+
     pub fn screen_filter_mut(&mut self) -> PersistenceGuard<'_, ScreenFilter> {
         PersistenceGuard(
             self.accessibility_filter.0.clone(),
@@ -998,6 +1103,26 @@ fn config_changed(config: cosmic_config::Config, keys: Vec<String>, state: &mut 
             "cursor_shake_to_find" => {
                 let new = get_config::<bool>(&config, "cursor_shake_to_find");
                 state.common.config.cosmic_conf.cursor_shake_to_find = new;
+            }
+            "night_light_mode" => {
+                state.common.config.cosmic_conf.night_light_mode =
+                    get_config::<NightLightMode>(&config, "night_light_mode");
+                apply_night_light(state);
+            }
+            "night_light_temperature" => {
+                state.common.config.cosmic_conf.night_light_temperature =
+                    get_config::<u32>(&config, "night_light_temperature");
+                apply_night_light(state);
+            }
+            "night_light_start" => {
+                state.common.config.cosmic_conf.night_light_start =
+                    get_config::<u32>(&config, "night_light_start");
+                apply_night_light(state);
+            }
+            "night_light_end" => {
+                state.common.config.cosmic_conf.night_light_end =
+                    get_config::<u32>(&config, "night_light_end");
+                apply_night_light(state);
             }
             "cursor_hide" => {
                 let new = get_config::<CursorHideConfig>(&config, "cursor_hide");

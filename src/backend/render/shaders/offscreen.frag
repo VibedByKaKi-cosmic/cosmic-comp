@@ -22,6 +22,7 @@ uniform float tint;
 
 uniform float invert;
 uniform float color_mode;
+uniform vec3 night_light;
 
 void main() {
     vec4 color = texture2D(tex, v_coords);
@@ -82,6 +83,9 @@ void main() {
 
         color.rgb += correction;
     }
+
+    // Night light: per-channel multipliers for the color temperature (1.0 is off).
+    color.rgb *= night_light;
 
     // re-multiply
     color.rgb *= color.a;
