@@ -191,6 +191,10 @@ impl Config {
                 }
                 c
             });
+        crate::utils::animation::configure(
+            cosmic_comp_config.animations,
+            cosmic_comp_config.animation_speed,
+        );
 
         // `cursor_hide_timeout` was replaced by the grouped `cursor_hide` key.
         // Seed the new key once so configs hand-edited before the rename keep
@@ -935,6 +939,28 @@ fn config_changed(config: cosmic_config::Config, keys: Vec<String>, state: &mut 
                 let new = get_config::<bool>(&config, "active_hint");
                 if new != state.common.config.cosmic_conf.active_hint {
                     state.common.config.cosmic_conf.active_hint = new;
+                    state.common.update_config();
+                }
+            }
+            "animations" => {
+                let new = get_config::<bool>(&config, "animations");
+                if new != state.common.config.cosmic_conf.animations {
+                    state.common.config.cosmic_conf.animations = new;
+                    crate::utils::animation::configure(
+                        new,
+                        state.common.config.cosmic_conf.animation_speed,
+                    );
+                    state.common.update_config();
+                }
+            }
+            "animation_speed" => {
+                let new = get_config::<f64>(&config, "animation_speed");
+                if new != state.common.config.cosmic_conf.animation_speed {
+                    state.common.config.cosmic_conf.animation_speed = new;
+                    crate::utils::animation::configure(
+                        state.common.config.cosmic_conf.animations,
+                        new,
+                    );
                     state.common.update_config();
                 }
             }

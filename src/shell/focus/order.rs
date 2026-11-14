@@ -247,8 +247,10 @@ fn render_input_order_internal<R: 'static>(
                         EaseInOutCubic,
                         0.0,
                         1.0,
-                        Instant::now().duration_since(*st).as_millis() as f32
-                            / ANIMATION_DURATION.as_millis() as f32,
+                        crate::utils::animation::progress(
+                            Instant::now().duration_since(*st),
+                            ANIMATION_DURATION,
+                        ),
                     ),
                 ),
                 WorkspaceDelta::Gesture {

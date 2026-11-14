@@ -238,18 +238,19 @@ impl State {
     fn next_tab_animation(&self) -> Option<&TabAnimationState> {
         let now = Instant::now();
 
-        self.tab_animations
-            .iter()
-            .find(|anim| now.duration_since(anim.start_time) <= TAB_ANIMATION_DURATION)
+        self.tab_animations.iter().find(|anim| {
+            now.duration_since(anim.start_time)
+                <= crate::utils::animation::duration(TAB_ANIMATION_DURATION)
+        })
     }
 
     pub fn offset(&self, bounds: Rectangle, content_bounds: Size) -> Vector {
         if let Some(animation) = self.scroll_animation {
             let percentage = {
-                let percentage = Instant::now()
-                    .duration_since(animation.start_time)
-                    .as_millis() as f32
-                    / SCROLL_ANIMATION_DURATION.as_millis() as f32;
+                let percentage = crate::utils::animation::progress(
+                    Instant::now().duration_since(animation.start_time),
+                    SCROLL_ANIMATION_DURATION,
+                );
 
                 ease(EaseInOutCubic, 0.0, 1.0, percentage)
             };
@@ -274,7 +275,8 @@ impl State {
         let start_time = Instant::now();
 
         if let Some(animation) = self.scroll_animation.as_ref()
-            && start_time.duration_since(animation.start_time) > SCROLL_ANIMATION_DURATION
+            && start_time.duration_since(animation.start_time)
+                > crate::utils::animation::duration(SCROLL_ANIMATION_DURATION)
         {
             self.scroll_animation.take();
         }
@@ -290,7 +292,9 @@ impl State {
         if let Some(mut animation) = tab_animations.pop_front() {
             let mut set_next_start = false;
 
-            while start_time.duration_since(animation.start_time) > TAB_ANIMATION_DURATION {
+            while start_time.duration_since(animation.start_time)
+                > crate::utils::animation::duration(TAB_ANIMATION_DURATION)
+            {
                 set_next_start = true;
 
                 if let Some(next) = tab_animations.pop_front() {
@@ -563,10 +567,10 @@ where
                 let tab_animation = state.next_tab_animation();
 
                 let percentage = if let Some(animation) = tab_animation {
-                    let percentage = Instant::now()
-                        .duration_since(animation.start_time)
-                        .as_millis() as f32
-                        / TAB_ANIMATION_DURATION.as_millis() as f32;
+                    let percentage = crate::utils::animation::progress(
+                        Instant::now().duration_since(animation.start_time),
+                        TAB_ANIMATION_DURATION,
+                    );
                     ease(EaseOutCubic, 0.0, 1.0, percentage)
                 } else {
                     1.0

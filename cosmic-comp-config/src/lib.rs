@@ -113,6 +113,12 @@ pub struct CosmicCompConfig {
     pub cursor_shake_to_find: bool,
     pub activation_policy: ActivationPolicy,
     pub decoration_preference: DecorationPreference,
+    /// Enable compositor animations (workspace switches, window open/close, tiling, fullscreen,
+    /// overview and focus transitions). When disabled, all of them happen instantly.
+    pub animations: bool,
+    /// Multiplier for animation speed. 2.0 runs animations twice as fast, 0.5 twice as slow.
+    /// Clamped to 0.1..=10.0.
+    pub animation_speed: f64,
 }
 
 impl Default for CosmicCompConfig {
@@ -153,6 +159,8 @@ impl Default for CosmicCompConfig {
             cursor_shake_to_find: true,
             activation_policy: ActivationPolicy::default(),
             decoration_preference: DecorationPreference::default(),
+            animations: true,
+            animation_speed: 1.0,
         }
     }
 }
