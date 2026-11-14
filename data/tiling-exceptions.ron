@@ -6,10 +6,11 @@
 			"Discord Updater",
 		]
 	),
-	// Empty appid matches every app_id, since "" is an unanchored regex
+	// Empty appid title only matches
 	(
-		appid: "",
+		appid: "", 
 		titles: [
+			"Steam",
 			"wl-clipboard",
 		]
 	),
@@ -31,19 +32,7 @@
 	(appid: "Mozilla VPN", titles: [".*"]),
 	(appid: "update-manager", titles: ["Software Updater"]),
 	(appid: "Solaar", titles: [".*"]),
-	// Steam client dialogs. The main client window ("Steam", "Steam Big Picture") matches none of
-	// these titles, so it stays tiled. Steam games use the app_id "steam_app_<id>" and never match.
-	(
-		appid: "^(com[.]valvesoftware[.])?[Ss]team$",
-		titles: [
-			"(?i)^Steam Settings$",
-			"(?i)^Friends List$",
-			"(?i)^Steam - News$",
-			"(?i)^Add a Game$",
-			"(?i)^Screenshot Uploader$",
-			"^.*?(Guard|Login).*",
-		]
-	),
+	(appid: "Steam", titles: ["^.*?(Guard|Login).*"]),
 	(appid: "TelegramDesktop", titles: ["Media viewer"]),
 	(appid: "Zotero", titles: ["Quick Format Citation"]),
 	(appid: "gjs", titles: [".*"]),

@@ -72,6 +72,9 @@ pub struct Config {
     pub shortcuts: Shortcuts,
     // Tiling exceptions from `com.system76.CosmicSettings.WindowRules`
     pub tiling_exceptions: Vec<ApplicationException>,
+    /// User rules with `enabled: false` from `tiling_exception_custom`. A matching window tiles
+    /// even when a default exception matches it.
+    pub tiling_exception_overrides: Vec<ApplicationException>,
     /// System actions from `com.system76.CosmicSettings.Shortcuts`
     pub system_actions: BTreeMap<shortcuts::action::System, String>,
 }
@@ -169,6 +172,22 @@ pub enum ColorFilter {
     Protanopia = 2,
     Deuteranopia = 3,
     Tritanopia = 4,
+}
+
+/// Returns the user rules with `enabled: false` from `tiling_exception_custom`.
+///
+/// Matching windows tile even when a default exception matches them.
+fn tiling_exception_overrides(context: &cosmic_config::Config) -> Vec<ApplicationException> {
+    context
+        .get::<Vec<window_rules::PreciseApplicationException>>("tiling_exception_custom")
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|exception| !exception.enabled)
+        .map(|exception| ApplicationException {
+            appid: exception.appid,
+            title: exception.title,
+        })
+        .collect()
 }
 
 impl Config {
@@ -310,8 +329,11 @@ impl Config {
                             "tiling_exception_defaults" | "tiling_exception_custom" => {
                                 let new_exceptions = window_rules::tiling_exceptions(&config);
                                 state.common.config.tiling_exceptions = new_exceptions;
+                                state.common.config.tiling_exception_overrides =
+                                    tiling_exception_overrides(&config);
                                 state.common.shell.write().update_tiling_exceptions(
                                     state.common.config.tiling_exceptions.iter(),
+                                    state.common.config.tiling_exception_overrides.iter(),
                                 );
                             }
                             _ => (),
@@ -350,6 +372,7 @@ impl Config {
             shortcuts,
             system_actions,
             tiling_exceptions,
+            tiling_exception_overrides: tiling_exception_overrides(&window_rules_context),
         }
     }
 

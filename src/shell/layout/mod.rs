@@ -55,48 +55,76 @@ pub fn is_dialog(window: &CosmicSurface) -> bool {
 
 #[derive(Debug, Clone, Default)]
 pub struct TilingExceptions {
+    /// Default exceptions: a window floats when an app_id and a title pattern match.
     app_ids: RegexSet,
     titles: RegexSet,
+    /// User rules with `enabled: false`: a window tiles when an app_id and a title pattern match,
+    /// even if a default exception matches it too.
+    override_app_ids: RegexSet,
+    override_titles: RegexSet,
 }
 
 impl TilingExceptions {
-    pub fn new<'a, I>(exceptions_config: I) -> Self
+    pub fn new<'a, 'b, I, J>(exceptions_config: I, overrides_config: J) -> Self
     where
         I: Iterator<Item = &'a ApplicationException>,
+        J: Iterator<Item = &'b ApplicationException>,
     {
-        let mut app_ids = Vec::new();
-        let mut titles = Vec::new();
-
-        for exception in exceptions_config {
-            if let Err(e) = Regex::new(&exception.appid) {
-                warn!("Invalid regex for appid: {}, {}", exception.appid, e);
-                continue;
-            }
-            if let Err(e) = Regex::new(&exception.title) {
-                warn!("Invalid regex for title: {}, {}", exception.appid, e);
-                continue;
-            }
-
-            app_ids.push(exception.appid.clone());
-            titles.push(exception.title.clone());
-        }
+        let (app_ids, titles) = pattern_sets(exceptions_config);
+        let (override_app_ids, override_titles) = pattern_sets(overrides_config);
 
         Self {
-            app_ids: RegexSet::new(app_ids).unwrap(),
-            titles: RegexSet::new(titles).unwrap(),
+            app_ids,
+            titles,
+            override_app_ids,
+            override_titles,
         }
     }
 }
 
-pub fn has_floating_exception(exceptions: &TilingExceptions, window: &CosmicSurface) -> bool {
-    // else take a look at our exceptions
-    let appid_matches = exceptions.app_ids.matches(&window.app_id());
-    let title_matches = exceptions.titles.matches(&window.title());
-    for idx in appid_matches.into_iter() {
-        if title_matches.matched(idx) {
-            return true;
+/// Builds the app_id and title pattern sets. Entries are index-aligned: index `i` in both sets
+/// comes from the same rule. Patterns that do not compile are skipped.
+fn pattern_sets<'a, I>(exceptions_config: I) -> (RegexSet, RegexSet)
+where
+    I: Iterator<Item = &'a ApplicationException>,
+{
+    let mut app_ids = Vec::new();
+    let mut titles = Vec::new();
+
+    for exception in exceptions_config {
+        if let Err(e) = Regex::new(&exception.appid) {
+            warn!("Invalid regex for appid: {}, {}", exception.appid, e);
+            continue;
         }
+        if let Err(e) = Regex::new(&exception.title) {
+            warn!("Invalid regex for title: {}, {}", exception.title, e);
+            continue;
+        }
+
+        app_ids.push(exception.appid.clone());
+        titles.push(exception.title.clone());
     }
 
-    false
+    (RegexSet::new(app_ids).unwrap(), RegexSet::new(titles).unwrap())
+}
+
+/// Returns true if one rule matches the window: its app_id pattern and its title pattern both match.
+fn any_rule_matches(app_ids: &RegexSet, titles: &RegexSet, window: &CosmicSurface) -> bool {
+    let appid_matches = app_ids.matches(&window.app_id());
+    let title_matches = titles.matches(&window.title());
+    appid_matches
+        .into_iter()
+        .any(|idx| title_matches.matched(idx))
+}
+
+/// Returns true if a default exception floats the window.
+///
+/// A user rule with `enabled: false` that matches the window wins over the defaults, so the
+/// window tiles.
+pub fn has_floating_exception(exceptions: &TilingExceptions, window: &CosmicSurface) -> bool {
+    if any_rule_matches(&exceptions.override_app_ids, &exceptions.override_titles, window) {
+        return false;
+    }
+
+    any_rule_matches(&exceptions.app_ids, &exceptions.titles, window)
 }
