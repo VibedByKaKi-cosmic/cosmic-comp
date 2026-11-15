@@ -105,7 +105,10 @@ where
         titles.push(exception.title.clone());
     }
 
-    (RegexSet::new(app_ids).unwrap(), RegexSet::new(titles).unwrap())
+    (
+        RegexSet::new(app_ids).unwrap(),
+        RegexSet::new(titles).unwrap(),
+    )
 }
 
 /// Returns true if one rule matches the window: its app_id pattern and its title pattern both match.
@@ -122,7 +125,11 @@ fn any_rule_matches(app_ids: &RegexSet, titles: &RegexSet, window: &CosmicSurfac
 /// A user rule with `enabled: false` that matches the window wins over the defaults, so the
 /// window tiles.
 pub fn has_floating_exception(exceptions: &TilingExceptions, window: &CosmicSurface) -> bool {
-    if any_rule_matches(&exceptions.override_app_ids, &exceptions.override_titles, window) {
+    if any_rule_matches(
+        &exceptions.override_app_ids,
+        &exceptions.override_titles,
+        window,
+    ) {
         return false;
     }
 
